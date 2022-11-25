@@ -8,6 +8,8 @@ local debug = debug
 local pairs = pairs
 local string = string
 local tostring = tostring
+local string_format = string.format
+local string_rep = string.rep
 
 local skynet = require "skynet"
 local clog = require("clog")
@@ -46,9 +48,11 @@ end
 
 --- 初始化日志输出到控制台
 function luclog.initConsole()
-    clog.init(0, {{
-        level = Log.DEBUG,
-    }})
+    clog.init(0, {
+        {
+            level = Log.DEBUG,
+        },
+    })
 end
 
 function luclog.d(...)
@@ -78,45 +82,49 @@ end
 
 --- 获取dump字符串
 function luclog.dumpstr(src, dsc, nest, deep)
-    local indent = luclog._dumpWrap and "  " or ""
+    dsc = dsc or "dumpstr"
+    if type(src) ~= "table" then
+        return string_format("%s=%s", dsc, tostring(src))
+    end
+
     local function _dump_val(val)
-        local fmt = type(val) == "string" and "\"%s\"," or "%s,"
-        return string.format(fmt, tostring(val))
+        local ty = type(val) -- nil, boolean, number, string, functio, userdata, thread 和 table
+        local fmt = (ty == "boolean" or ty == "number" or ty == "nil") and "%s," or "%q,"
+        return string_format(fmt, tostring(val))
     end
 
-    local function _dump_key(key)
+    local indent = luclog._dumpWrap and "  " or ""
+    local function _dump_key(key, _deep)
         local fmt = type(key) == "string" and "%s[\"%s\"]" or "%s[%s]"
-        return string.format(fmt, string.rep(indent, deep), tostring(key))
+        return string_format(fmt, string_rep(indent, _deep), tostring(key))
     end
 
-    local function _dump_table()
-        local lines = {string.format("%s%s", dsc, "={")}
-        for key, val in pairs(src) do
-            if type(val) == "table" then
-                lines[#lines + 1] = luclog.dumpstr(val, _dump_key(key), nest - 1, deep + 1)
+    deep = deep or 1
+    nest = type(nest) == "number" and nest or 10
+    local refs = {[src]=true}
+    local function _iter_dump(_src, _dsc, _nest, _deep)
+        if _nest == 0 then
+            return "\"over nest\","
+        end
+
+        local lines = {
+            string_format("%s%s", _dsc, "={"),
+        }
+        for key, val in pairs(_src) do
+            if type(val) ~= "table" then
+                lines[#lines + 1] = string_format("%s=%s", _dump_key(key, _deep), _dump_val(val))
+            elseif refs[val] then
+                lines[#lines + 1] = string_format("%s=\"ref%s\",", _dump_key(key, _deep), tostring(val))
             else
-                lines[#lines + 1] = string.format("%s=%s", _dump_key(key), _dump_val(val))
+                refs[val] = true
+                lines[#lines + 1] = _iter_dump(val, _dump_key(key, _deep), _nest - 1, _deep + 1)
             end
         end
-        lines[#lines + 1] = string.format("%s%s", string.rep(indent, deep - 1), deep == 1 and "}" or "},")
+        lines[#lines + 1] = string_format("%s%s", string_rep(indent, _deep - 1), _deep == 1 and "}" or "},")
         return luclog._dumpWrap and table.concat(lines, "\n") or table.concat(lines)
     end
 
-    local _, ret = pcall(function()
-        dsc = dsc or "dumpstr"
-        deep = deep or 1
-        nest = type(nest) == "number" and nest or 10
-
-        if type(src) ~= "table" then
-            return dsc .. tostring(src)
-        end
-
-        if nest == 0 then
-            return "over nest"
-        end
-
-        return _dump_table()
-    end)
+    local _, ret = pcall(_iter_dump, src, dsc, nest, deep)
     return ret
 end
 
@@ -136,7 +144,7 @@ function luclog._logtag()
             return
         end
         _tokenn = _tokenn + 1
-        _tokens[_tokenn] = string.format("%s%s", k, v)
+        _tokens[_tokenn] = string_format("%s%s", k, v)
     end
 
     _tokenn = 0
