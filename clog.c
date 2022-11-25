@@ -348,7 +348,7 @@ loggerf(lua_State* L, int logId) {
 
     int level = lua_tointeger(L, 1); // NULL则为0
     struct Logger* logger = loggers[logId-1];
-    if (NULL != logger && level < logger->level) return;
+    if (NULL == logger || level < logger->level) return;
 
     const char* tag = lua_tostring(L, 2);
     if (luai_unlikely(tag == NULL)) return;
