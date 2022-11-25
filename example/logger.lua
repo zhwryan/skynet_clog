@@ -6,21 +6,25 @@ require 'skynet.manager'
 local skynet = require 'skynet'
 
 -- Log请在preload中require
-Log.init(3, {{
-    dir = "./data/log",
-    fname = "test",
-    fsize = 100,
-}, {
-    level = Log.INFO,
-    dir = "./data/sync_log",
-    fname = "nid1",
-    cuthour = 1,
-}, {
-    level = Log.INFO,
-    dir = "./data/async_log",
-    fname = "kid1",
-    cuthour = 1,
-}})
+Log.init(3, {
+    {
+        dir = "./data/log",
+        fname = "skynet",
+        fsize = 100,
+    },
+    {
+        level = Log.INFO,
+        dir = "./data/bigdata/sync_log",
+        fname = "sync",
+        cuthour = 1,
+    },
+    {
+        level = Log.INFO,
+        dir = "./data/bigdata/async_log",
+        fname = "async",
+        cuthour = 1,
+    },
+})
 
 skynet.register_protocol({
     name = 'text',
