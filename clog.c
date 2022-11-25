@@ -30,7 +30,14 @@
 #define VALID_CLOGFILE(file) (file != NULL && file != stdout) // 检查文件句柄
 
 static char _CLOG_INITED = 0;
-static const char * levelnames[] = {"DEBUG", "INFO", "WARN", "ERROR", "FATAL", NULL};
+static const char * levelTags[] = {
+    "\033[34mDEBUG\033[0m",
+    "\033[32mINFO\033[0m",
+    "\033[33mWARN\033[0m",
+    "\033[31mERROR\033[0m",
+    "\033[35mFATAL\033[0m",
+    NULL
+};
 enum logger_level {DEBUG = 0, INFO = 1, WARN = 2, ERROR = 3, FATAL = 4};
 
 struct ClogContext {
@@ -187,7 +194,7 @@ initFileHandle(struct Logger* logger) {
 
 static inline const char*
 strLevel(int* level) {
-    const char* strlv = levelnames[*level];
+    const char* strlv = levelTags[*level];
     return strlv ? strlv : "NULL";
 }
 
