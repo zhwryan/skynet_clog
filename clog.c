@@ -366,7 +366,7 @@ loggerf(lua_State* L, int logId) {
 
     pthread_mutex_lock(&context.mutex);
     strftime(context.date, SZ_LONG_64, "%Y-%m-%d %H:%M:%S", localtime(&tv.tv_sec));
-    outputf(logId, &tv.tv_sec, "%s.%.3d [%s][%s] %s\n", context.date, tv.tv_usec/1000, strLevel(&level), tag, logmsg);
+    outputf(logId, &tv.tv_sec, "%s.%.3ld [%s][%s] %s\n", context.date, tv.tv_usec/1000, strLevel(&level), tag, logmsg);
     pthread_mutex_unlock(&context.mutex);
 }
 
