@@ -21,7 +21,7 @@ local luclog = {
     WARN = 2,
     ERROR = 3,
     FATAL = 4,
-    _dumpWrap = true, -- 输出时需要换行
+    _dumpWrap = false, -- 输出时需要换行
 }
 
 --- 初始化日志,一般只在logger内做一次
