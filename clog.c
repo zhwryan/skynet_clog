@@ -15,7 +15,7 @@
 
 #define SZ_LONG_64 (64)
 #define SZ_LONG_128 (SZ_LONG_64*2)
-#define SZ_LONG_256 (SZ_LONG_128*2)
+#define SZ_LONG_512 (SZ_LONG_128*2*2)
 #define ONE_MB (1024*1024)
 
 #define DFL_FTIME (3) // 默认刷新时间
@@ -30,7 +30,7 @@
 #define VALID_CLOGFILE(file) (file != NULL && file != stdout) // 检查文件句柄
 
 static char _CLOG_INITED = 0;
-static const char * levelTags[] = {
+static const char* levelTags[] = {
     "\033[34mDEBUG\033[0m",
     "\033[32mINFO\033[0m",
     "\033[33mWARN\033[0m",
@@ -38,7 +38,7 @@ static const char * levelTags[] = {
     "\033[35mFATAL\033[0m",
     NULL
 };
-enum logger_level {DEBUG = 0, INFO = 1, WARN = 2, ERROR = 3, FATAL = 4};
+enum logger_level { DEBUG = 0, INFO = 1, WARN = 2, ERROR = 3, FATAL = 4 };
 
 struct ClogContext {
     int ftime; // 异步写文件cd,单元秒
@@ -60,11 +60,11 @@ struct Logger {
     int filen; // 日志文件索引
     char fname[SZ_LONG_64]; // 文件名
     char dir[SZ_LONG_128]; // 目录名
-    char filepath[SZ_LONG_256]; // 全路径
+    char filepath[SZ_LONG_512]; // 全路径
 };
 
 // 关于指针的判断,不必所有用处都判断,关注入口和并发逻辑即可
-struct Logger* loggers[SZ_LOGGERS] = {NULL};
+struct Logger* loggers[SZ_LOGGERS] = { NULL };
 
 static inline void
 closeFile(struct Logger* logger) {
@@ -76,7 +76,7 @@ closeFile(struct Logger* logger) {
 }
 
 static inline void
-closeAllFiles() {
+closeAllFiles(void) {
     for (int i = 0; loggers[i] != NULL; ++i)
         closeFile(loggers[i]);
 }
@@ -99,10 +99,10 @@ pathfill(char* filepath, int index, struct Logger* logger) {
     char date[SZ_LONG_64];
     if (logger->cuthour) {
         strftime(date, SZ_LONG_64, "%Y%m%d-%H", &tm);
-        snprintf(filepath, SZ_LONG_256, "%s/%s-%s.log", logger->dir, logger->fname, date);
+        snprintf(filepath, SZ_LONG_512, "%s/%s-%s.log", logger->dir, logger->fname, date);
     } else if (index >= 0) {
         strftime(date, SZ_LONG_64, "%y%m%d", &tm);
-        snprintf(filepath, SZ_LONG_256, "%s/%s.log.%s.%d", logger->dir, logger->fname, date, index);
+        snprintf(filepath, SZ_LONG_512, "%s/%s.log.%s.%d", logger->dir, logger->fname, date, index);
     } else
         RETURN_CLOGERR("filepath fill index err", NULL);
 }
@@ -164,10 +164,10 @@ static inline void // 按小时切割时不能调用
 rollFileSize(struct Logger* logger) {
     closeFile(logger);
 
-    char oldfile[SZ_LONG_128];
-    char newfile[SZ_LONG_128];
+    char oldfile[SZ_LONG_512];
+    char newfile[SZ_LONG_512];
     for (int i = logger->filen; i > 0; --i) {
-        pathfill(oldfile, i-1, logger);
+        pathfill(oldfile, i - 1, logger);
         pathfill(newfile, i, logger);
         rename(oldfile, newfile);
     }
@@ -182,7 +182,7 @@ initFileHandle(struct Logger* logger) {
         pathfill(logger->filepath, context.tm_hour, logger);
         newFile(logger);
     } else {
-        char filepath[SZ_LONG_256];
+        char filepath[SZ_LONG_512];
         for (logger->filen = 0; logger->filen < 100000; logger->filen++) {
             pathfill(filepath, logger->filen, logger);
             if (0 != access(filepath, F_OK)) break;
@@ -200,7 +200,7 @@ strLevel(int* level) {
 
 static inline void
 tryRollFile(time_t* logtime) {
-    int utcHour = ceil(time(NULL)/3600);
+    int utcHour = ceil(time(NULL) / 3600);
     if (utcHour == context.utcHour) return;
 
     struct tm* local = localtime(logtime);
@@ -219,8 +219,8 @@ tryRollFile(time_t* logtime) {
 }
 
 static inline void
-outputf(int logId, time_t* logtime, const char *fmt, ...) {
-    struct Logger* logger = loggers[logId-1];
+outputf(int logId, time_t* logtime, const char* fmt, ...) {
+    struct Logger* logger = loggers[logId - 1];
     if (NULL == logger || NULL == logtime || NULL == fmt) return;
 
     va_list args;
@@ -291,7 +291,7 @@ initLoggers(lua_State* L) {
         int loggerType = lua_rawgeti(L, 2, logId); // 取值并压栈
         if (LUA_TTABLE != loggerType) return;
 
-        struct Logger *logger = skynet_malloc(sizeof(struct Logger));
+        struct Logger* logger = skynet_malloc(sizeof(struct Logger));
         memset(logger, 0, sizeof(struct Logger));
 
         logger->level = loadIntField(L, "level"); // 日志等级
@@ -302,8 +302,7 @@ initLoggers(lua_State* L) {
 
             if (!loadStringField(L, "fname", logger->fname, sizeof(logger->fname)) || // 日志名
                 !newDir(logger->dir, 0755) || // 创建目录
-                !initFileHandle(logger))
-            {
+                !initFileHandle(logger)) {
                 skynet_free(logger);
                 return;
             }
@@ -354,7 +353,7 @@ loggerf(lua_State* L, int logId) {
     if (luai_unlikely(1 > logId || logId > SZ_LOGGERS)) return;
 
     int level = lua_tointeger(L, 1); // NULL则为0
-    struct Logger* logger = loggers[logId-1];
+    struct Logger* logger = loggers[logId - 1];
     if (NULL == logger || level < logger->level) return;
 
     const char* tag = lua_tostring(L, 2);
@@ -363,7 +362,7 @@ loggerf(lua_State* L, int logId) {
     const char* logmsg = concatParams(L, 3, SZ_ONE_LOG);
     if (luai_unlikely(logmsg == NULL)) return;
 
-    if(level >= ERROR) { // 是否打印堆栈
+    if (level >= ERROR) { // 是否打印堆栈
         luaL_traceback(L, L, logmsg, 2);
         logmsg = lua_tolstring(L, -1, NULL);
     }
@@ -373,7 +372,7 @@ loggerf(lua_State* L, int logId) {
 
     pthread_mutex_lock(&context.mutex);
     strftime(context.date, SZ_LONG_64, "%Y-%m-%d %H:%M:%S", localtime(&tv.tv_sec));
-    outputf(logId, &tv.tv_sec, "%s.%.3ld [%s][%s] %s\n", context.date, tv.tv_usec/1000, strLevel(&level), tag, logmsg);
+    outputf(logId, &tv.tv_sec, "%s.%.3ld [%s][%s] %s\n", context.date, tv.tv_usec / 1000, strLevel(&level), tag, logmsg);
     pthread_mutex_unlock(&context.mutex);
 }
 
@@ -391,7 +390,7 @@ initContext(lua_State* L) {
     struct tm* local = localtime(&now);
     if (NULL == local) return 0;
 
-    context.utcHour = ceil(now/3600);
+    context.utcHour = ceil(now / 3600);
     context.tm_hour = local->tm_hour;
 
     if (pthread_mutex_init(&context.mutex, NULL) != 0) return 0;
@@ -459,7 +458,7 @@ lformat(lua_State* L) {
     const char* msg = concatParams(L, 3, SZ_ONE_LOG);
     if (luai_unlikely(msg == NULL)) return 0;
 
-    if(level >= ERROR) { // 是否打印堆栈
+    if (level >= ERROR) { // 是否打印堆栈
         luaL_traceback(L, L, msg, 2);
         msg = lua_tolstring(L, -1, NULL);
     }
@@ -467,11 +466,16 @@ lformat(lua_State* L) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
-    char date[SZ_LONG_64] = {0};
-    char filepath[SZ_LONG_256] = {0};
+    char date[SZ_LONG_64] = { 0 };
+    char filepath[SZ_LONG_512] = { 0 };
 
-    strftime(date, SZ_LONG_64, "%Y-%m-%d %H:%M:%S", localtime(&tv.tv_sec));
-    snprintf(filepath, SZ_LONG_256, "%s.%.3d [%s][%s] %s\n", date, tv.tv_usec/1000, strLevel(&level), tag, msg);
+    // 获取时间戳并格式化日期部分
+    time_t current_time = tv.tv_sec;
+    struct tm* time_info = localtime(&current_time);
+    strftime(date, SZ_LONG_64, "%Y-%m-%d %H:%M:%S", time_info);
+
+    // 格式化文件路径
+    snprintf(filepath, SZ_LONG_512, "%s.%.3d [%s][%s] %s\n", date, (int)(tv.tv_usec / 1000), strLevel(&level), tag, msg);
 
     lua_pushstring(L, filepath);
     return 1;
