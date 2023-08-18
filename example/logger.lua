@@ -1,5 +1,4 @@
 --- 日志服务
--- 简单的skynet日志服务的例子
 -- @module logger
 -- @author <zhenghongwei@onemt.com.cn>
 require 'skynet.manager'

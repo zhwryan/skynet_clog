@@ -101,10 +101,12 @@ function luclog.dumpstr(src, dsc, nest, deep)
 
     deep = deep or 1
     nest = type(nest) == "number" and nest or 10
-    local refs = {[src]=true}
+    local refs = {
+        [src] = true,
+    }
     local function _iter_dump(_src, _dsc, _nest, _deep)
         if _nest == 0 then
-            return "\"over nest\","
+            return string_format("%s=\"nest%s\",", _dsc, _src)
         end
 
         local lines = {
@@ -149,7 +151,6 @@ function luclog._logtag()
 
     _tokenn = 0
     _tagkv("s:", _svcaddr)
-    _tagkv("n:", SERVICE_NAME)
     _tokens[_tokenn + 1] = nil
 
     return table.concat(_tokens, "|") or ""
@@ -163,6 +164,11 @@ end
 -- 纯净输出到logger
 function luclog.rawput(logidx, ...)
     clog.rawput(logidx, ...)
+end
+
+-- 更新日志级别
+function luclog.setlv(logidx, lv)
+    clog.setlv(logidx, lv)
 end
 
 return luclog

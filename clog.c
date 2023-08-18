@@ -44,6 +44,7 @@ struct ClogContext {
     int ftime; // 异步写文件cd,单元秒
     int utcHour; // int(time(NULL)/3600)
     int tm_hour; // 当前小时
+    int cmDate; // combineDate
     int running; // 线程内使用
     char date[SZ_LONG_64];
     pthread_t thread;
@@ -73,6 +74,11 @@ closeFile(struct Logger* logger) {
         fclose(logger->file);
     }
     logger->file = stdout;
+}
+
+static inline int
+combineDate(int year, int month, int day) {
+    return (year - 1900) * 10000 + (month + 1) * 100 + day;
 }
 
 static inline void
@@ -206,16 +212,21 @@ tryRollFile(time_t* logtime) {
     struct tm* local = localtime(logtime);
     if (NULL == local) return;
 
-    context.utcHour = utcHour;
-    context.tm_hour = local->tm_hour; // 0-23
-
+    int cmDate = combineDate(local->tm_year, local->tm_mon, local->tm_mday);
     for (int i = 0; loggers[i] != NULL; i++) {
         struct Logger* logger = loggers[i];
-        if (logger->cuthour || context.tm_hour == 0) {
-            pathfill(logger->filepath, context.tm_hour, logger);
+        if (logger->cuthour) {
+            pathfill(logger->filepath, local->tm_hour, logger);
+            newFile(logger);
+        } else if (context.cmDate != cmDate) {
+            pathfill(logger->filepath, 0, logger);
             newFile(logger);
         }
     }
+
+    context.utcHour = utcHour;
+    context.tm_hour = local->tm_hour; // 0-23
+    context.cmDate = cmDate;
 }
 
 static inline void
@@ -372,7 +383,7 @@ loggerf(lua_State* L, int logId) {
 
     pthread_mutex_lock(&context.mutex);
     strftime(context.date, SZ_LONG_64, "%Y-%m-%d %H:%M:%S", localtime(&tv.tv_sec));
-    outputf(logId, &tv.tv_sec, "%s.%.3ld [%s][%s] %s\n", context.date, tv.tv_usec / 1000, strLevel(&level), tag, logmsg);
+    outputf(logId, &tv.tv_sec, "%s.%.3ld %s %s %s\n", context.date, tv.tv_usec / 1000, strLevel(&level), tag, logmsg);
     pthread_mutex_unlock(&context.mutex);
 }
 
@@ -391,6 +402,7 @@ initContext(lua_State* L) {
     if (NULL == local) return 0;
 
     context.utcHour = ceil(now / 3600);
+    context.cmDate = combineDate(local->tm_year, local->tm_mon, local->tm_mday);
     context.tm_hour = local->tm_hour;
 
     if (pthread_mutex_init(&context.mutex, NULL) != 0) return 0;
@@ -481,6 +493,21 @@ lformat(lua_State* L) {
     return 1;
 }
 
+static inline int // 更新日志级别
+lsetlv(lua_State* L) {
+    int logId = lua_tointeger(L, 1);
+    if (luai_unlikely(1 > logId || logId > SZ_LOGGERS)) return 0;
+
+    struct Logger* logger = loggers[logId - 1];
+    if (NULL == logger) return 0;
+
+    int level = lua_tointeger(L, 2); // NULL则为0
+    if (luai_unlikely(DEBUG > level || level > FATAL)) return 0;
+
+    logger->level = level;
+    return 0;
+}
+
 int
 luaopen_clog(lua_State* L) {
     luaL_checkversion(L);
@@ -491,6 +518,7 @@ luaopen_clog(lua_State* L) {
         { "lawput", llawput },
         { "rawput", lrawput },
         { "format", lformat },
+        { "setlv", lsetlv },
         { NULL, NULL },
     };
     luaL_newlib(L, l);
