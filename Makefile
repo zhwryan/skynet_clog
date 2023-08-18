@@ -1,37 +1,31 @@
 SKYNET_PATH ?= ../skynet/
-LUA_INC ?= $(SKYNET_PATH)3rd/lua
-SKYNET_INC ?= $(SKYNET_PATH)skynet-src
+LUA_INC := $(SKYNET_PATH)3rd/lua
+SKYNET_INC := $(SKYNET_PATH)skynet-src
 
-TARGET_NAME = clog
-TARGET = ${TARGET_NAME}.so
-OBJS = ${TARGET_NAME}.o
+CC := gcc
+CFLAGS := -std=gnu99 -O3 -Wall -pedantic -DNDEBUG -fPIC
 
-LNX_LDFLAGS = -shared
-MAC_LDFLAGS = -bundle -undefined dynamic_lookup
+TARGET := clog.so
+SRC_FILES := clog.c
+OBJ_FILES := $(SRC_FILES:.c=.o)
 
-CC = gcc
-LDFLAGS = $(MYLDFLAGS)
-
-CFLAGS = -std=gnu99 -O3 -Wall -pedantic -DNDEBUG -fPIC
-INC_FLAGS = -I$(LUA_INC) -I$(SKYNET_INC)
+.PHONY: all linux macosx clean
 
 all:
-	@echo "Usage: $(MAKE) <platform>"
-	@echo "  * linux"
-	@echo "  * macosx"
+	@echo "missing <platform> [linux/macosx]"
 
 .c.o:
-	$(CC) -c $(CFLAGS) $(INC_FLAGS) -o $@ $<
+	$(CC) -c $(CFLAGS) -I$(LUA_INC) -I$(SKYNET_INC) -o $@ $<
 
-linux:
-	@$(MAKE) $(TARGET) MYLDFLAGS="$(LNX_LDFLAGS)"
+linux: LDFLAGS := -shared
+linux: $(TARGET)
 
-macosx:
-	@$(MAKE) $(TARGET) MYLDFLAGS="$(MAC_LDFLAGS)"
+macosx: LDFLAGS := -bundle -undefined dynamic_lookup
+macosx: $(TARGET)
 
-$(TARGET): $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $(OBJS)
+$(TARGET): $(OBJ_FILES)
+	$(CC) $(LDFLAGS) -o $@ $^
+	@echo "Build $@ success!"
 
 clean:
-	rm -f *.o *.so
-
+	rm -f $(OBJ_FILES) $(TARGET)
